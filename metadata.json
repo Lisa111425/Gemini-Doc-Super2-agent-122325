@@ -1,0 +1,5 @@
+{
+  "name": "AuditFlow AI: Masterpiece Edition",
+  "description": "An agentic AI document intelligence platform featuring a unique 'Masterpiece' UI inspired by famous painters. Supports single and multi-file analysis, summarization, and RAG-based interrogation using Gemini 3.0/2.5 models.",
+  "requestFramePermissions": []
+}
