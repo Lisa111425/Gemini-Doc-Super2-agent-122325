@@ -71,3 +71,15 @@ export const readFileAsBase64 = (file: File): Promise<string> => {
         reader.readAsDataURL(file);
     });
 }
+
+export const downloadContent = (content: string, filename: string, extension: 'md' | 'txt') => {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${filename}.${extension}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+};

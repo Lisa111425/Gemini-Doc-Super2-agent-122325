@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ArrowRight, Bot, RefreshCw } from 'lucide-react';
+import { ArrowRight, Bot, RefreshCw, Copy, Check, Download, FileText, Eye, Code } from 'lucide-react';
 import { GeminiService } from '../services/geminiService';
+import { downloadContent } from '../services/fileService';
 import { AnalysisConfig, ArtistStyle, SUPPORTED_MODELS } from '../types';
 
 interface Props {
@@ -15,6 +16,8 @@ export const SmartReplace: React.FC<Props> = ({ apiKey, config, style }) => {
   const [instruction, setInstruction] = useState('Replace placeholders. Maintain a professional, formal tone.');
   const [output, setOutput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [viewMode, setViewMode] = useState<'text' | 'markdown'>('text');
 
   const handleProcess = async () => {
     if (!apiKey) return alert("API Key required");
@@ -23,6 +26,31 @@ export const SmartReplace: React.FC<Props> = ({ apiKey, config, style }) => {
     const res = await service.smartReplace(template, dataSource, instruction, config);
     setOutput(res);
     setLoading(false);
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(output);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const renderMarkdown = (text: string) => {
+    return text.split('\n').map((line, i) => {
+        if (line.startsWith('# ')) return <h2 key={i} className="text-xl font-bold mt-4 mb-2">{line.replace('# ', '')}</h2>;
+        if (line.startsWith('## ')) return <h3 key={i} className="text-lg font-bold mt-3 mb-1">{line.replace('## ', '')}</h3>;
+        if (line.startsWith('* ') || line.startsWith('- ')) return <li key={i} className="ml-4 list-disc opacity-80">{line.replace(/^[*|-]\s/, '')}</li>;
+         const parts = line.split(/(\*\*.*?\*\*)/g);
+         return (
+             <p key={i} className="mb-2 text-sm opacity-90 leading-relaxed">
+                 {parts.map((part, index) => {
+                     if (part.startsWith('**') && part.endsWith('**')) {
+                         return <strong key={index} className="text-white">{part.slice(2, -2)}</strong>;
+                     }
+                     return part;
+                 })}
+             </p>
+         );
+    });
   };
 
   return (
@@ -72,10 +100,33 @@ export const SmartReplace: React.FC<Props> = ({ apiKey, config, style }) => {
        </div>
 
        <div className={`col-span-1 lg:col-start-3 p-6 rounded-2xl bg-black/40 backdrop-blur-md border border-white/20 flex flex-col`}>
-           <h3 className="font-bold opacity-70 mb-4 text-green-400">Generated Output</h3>
+           <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold opacity-70 text-green-400">Generated Output</h3>
+                {output && (
+                    <div className="flex gap-1">
+                        <button 
+                             onClick={() => setViewMode(prev => prev === 'markdown' ? 'text' : 'markdown')} 
+                             className="p-1.5 bg-white/10 rounded hover:bg-white/20 text-white" 
+                             title={viewMode === 'markdown' ? "View Raw Text" : "View Markdown"}
+                        >
+                             {viewMode === 'markdown' ? <Code className="w-3 h-3"/> : <Eye className="w-3 h-3"/>}
+                        </button>
+                        <button onClick={copyToClipboard} className="p-1.5 bg-white/10 rounded hover:bg-white/20 text-white" title="Copy">
+                            {copied ? <Check className="w-3 h-3"/> : <Copy className="w-3 h-3"/>}
+                        </button>
+                        <button onClick={() => downloadContent(output, 'smart-replace', 'md')} className="p-1.5 bg-white/10 rounded hover:bg-white/20 text-white" title="MD">
+                            <Download className="w-3 h-3"/>
+                        </button>
+                        <button onClick={() => downloadContent(output, 'smart-replace', 'txt')} className="p-1.5 bg-white/10 rounded hover:bg-white/20 text-white" title="TXT">
+                            <FileText className="w-3 h-3"/>
+                        </button>
+                    </div>
+                )}
+           </div>
+           
            {output ? (
-               <div className="flex-1 w-full bg-transparent border-none p-4 font-mono text-sm leading-relaxed whitespace-pre-wrap">
-                   {output}
+               <div className="flex-1 w-full bg-transparent border-none p-4 font-mono text-sm leading-relaxed whitespace-pre-wrap overflow-y-auto">
+                   {viewMode === 'text' ? output : renderMarkdown(output)}
                </div>
            ) : (
                <div className="flex-1 flex items-center justify-center opacity-30 text-xs">

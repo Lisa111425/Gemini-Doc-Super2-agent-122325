@@ -100,8 +100,8 @@ function App() {
             {/* Settings */}
             <div className="p-4 border-t border-white/10 space-y-4">
                  
-                 {/* API Key Input - Only show if not in ENV */}
-                 {!process.env.API_KEY && isSidebarOpen && (
+                 {/* API Key Input */}
+                 {isSidebarOpen && (
                      <div className="bg-black/20 rounded-lg p-2 border border-white/5">
                         <div className="flex items-center gap-2 mb-1 text-xs opacity-50 px-1">
                             <Key size={12}/> API Access Key

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, FileText, Bot, Send, Loader2, Layers, Eye, X } from 'lucide-react';
-import { extractTextFromFile } from '../services/fileService';
+import { Upload, FileText, Bot, Send, Loader2, Layers, Eye, X, Download, Copy, Check, Code } from 'lucide-react';
+import { extractTextFromFile, downloadContent } from '../services/fileService';
 import { GeminiService } from '../services/geminiService';
 import { AnalysisConfig, ArtistStyle, ChatMessage, SUPPORTED_MODELS } from '../types';
 
@@ -25,6 +25,8 @@ export const MultiFileIntelligence: React.FC<Props> = ({ apiKey, config, style, 
   const [query, setQuery] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [previewFile, setPreviewFile] = useState<ProcessedFile | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [viewMode, setViewMode] = useState<'markdown' | 'text'>('markdown');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleFilesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,11 +88,37 @@ export const MultiFileIntelligence: React.FC<Props> = ({ apiKey, config, style, 
     setChatLoading(false);
   };
 
-    useEffect(() => {
+  const copyToClipboard = () => {
+      navigator.clipboard.writeText(combinedSummary);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+  };
+
+  useEffect(() => {
     if (scrollRef.current) {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [chatHistory]);
+
+  const renderMarkdown = (text: string) => {
+    return text.split('\n').map((line, i) => {
+        if (line.startsWith('# ')) return <h2 key={i} className="text-xl font-bold mt-4 mb-2">{line.replace('# ', '')}</h2>;
+        if (line.startsWith('## ')) return <h3 key={i} className="text-lg font-bold mt-3 mb-1">{line.replace('## ', '')}</h3>;
+        if (line.startsWith('* ') || line.startsWith('- ')) return <li key={i} className="ml-4 list-disc opacity-80">{line.replace(/^[*|-]\s/, '')}</li>;
+         // Simple bold parser
+         const parts = line.split(/(\*\*.*?\*\*)/g);
+         return (
+             <p key={i} className="mb-2 text-sm opacity-90">
+                 {parts.map((part, index) => {
+                     if (part.startsWith('**') && part.endsWith('**')) {
+                         return <strong key={index} className="text-white">{part.slice(2, -2)}</strong>;
+                     }
+                     return part;
+                 })}
+             </p>
+         );
+    });
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
@@ -141,16 +169,40 @@ export const MultiFileIntelligence: React.FC<Props> = ({ apiKey, config, style, 
 
         {combinedSummary ? (
             <>
-                 <div className="flex-1 overflow-y-auto mb-4 pr-2">
-                    <h1 className={`text-2xl font-bold mb-6 ${style.accentColor} border-b border-white/20 pb-4`}>Unified Intelligence Report</h1>
-                    <div className="prose prose-sm prose-invert max-w-none">
-                         {combinedSummary.split('\n').map((line, i) => {
-                            if (line.startsWith('# ')) return <h2 key={i} className="text-xl font-bold mt-4 mb-2">{line.replace('# ', '')}</h2>;
-                            if (line.startsWith('## ')) return <h3 key={i} className="text-lg font-bold mt-3 mb-1">{line.replace('## ', '')}</h3>;
-                            if (line.startsWith('* ')) return <li key={i} className="ml-4 list-disc opacity-80">{line.replace('* ', '')}</li>;
-                            return <p key={i} className="mb-2 text-sm opacity-90">{line}</p>;
-                        })}
+                 <div className="flex-1 overflow-y-auto mb-4 pr-2 relative">
+                    <div className="flex items-center justify-between mb-6 border-b border-white/20 pb-4">
+                         <h1 className={`text-2xl font-bold ${style.accentColor}`}>Unified Intelligence Report</h1>
+                         <div className="flex gap-2 mr-24"> 
+                            <button 
+                                onClick={() => setViewMode(prev => prev === 'markdown' ? 'text' : 'markdown')} 
+                                className="p-1.5 bg-black/20 rounded hover:bg-white/10" 
+                                title={viewMode === 'markdown' ? "View Raw Text" : "View Markdown"}
+                            >
+                                {viewMode === 'markdown' ? <Code className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}
+                            </button>
+                            <button onClick={copyToClipboard} className="p-1.5 bg-black/20 rounded hover:bg-white/10" title="Copy">
+                                {copied ? <Check className="w-4 h-4 text-green-400"/> : <Copy className="w-4 h-4"/>}
+                            </button>
+                            <button onClick={() => downloadContent(combinedSummary, 'Unified-Report', 'md')} className="p-1.5 bg-black/20 rounded hover:bg-white/10" title="Download MD">
+                                <Download className="w-4 h-4"/>
+                            </button>
+                             <button onClick={() => downloadContent(combinedSummary, 'Unified-Report', 'txt')} className="p-1.5 bg-black/20 rounded hover:bg-white/10" title="Download TXT">
+                                <FileText className="w-4 h-4"/>
+                            </button>
+                         </div>
                     </div>
+                    
+                    {viewMode === 'markdown' ? (
+                        <div className="prose prose-sm prose-invert max-w-none">
+                             {renderMarkdown(combinedSummary)}
+                        </div>
+                    ) : (
+                        <textarea 
+                             readOnly 
+                             value={combinedSummary} 
+                             className="w-full h-[60vh] bg-black/10 p-4 rounded-lg font-mono text-sm resize-none focus:outline-none text-opacity-80 leading-relaxed"
+                        />
+                    )}
                  </div>
 
                  {/* Chat Area */}

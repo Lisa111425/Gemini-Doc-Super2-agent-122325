@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, FileText, ArrowRight, Bot, Download, Loader2, Send } from 'lucide-react';
-import { extractTextFromFile } from '../services/fileService';
+import { Upload, FileText, ArrowRight, Bot, Download, Loader2, Send, Copy, Check, FileType, Eye, Code } from 'lucide-react';
+import { extractTextFromFile, downloadContent } from '../services/fileService';
 import { GeminiService } from '../services/geminiService';
 import { AnalysisConfig, ArtistStyle, ChatMessage, FileData, SUPPORTED_MODELS } from '../types';
 
@@ -19,6 +19,8 @@ export const FileIntelligence: React.FC<Props> = ({ apiKey, config, style, setCo
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [query, setQuery] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [viewMode, setViewMode] = useState<'markdown' | 'text'>('markdown');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,11 +65,38 @@ export const FileIntelligence: React.FC<Props> = ({ apiKey, config, style, setCo
     setChatLoading(false);
   };
 
+  const copyToClipboard = () => {
+      navigator.clipboard.writeText(summary);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+  };
+
   useEffect(() => {
     if (scrollRef.current) {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [chatHistory]);
+
+  const renderMarkdown = (text: string) => {
+    return text.split('\n').map((line, i) => {
+        if (line.startsWith('# ')) return <h1 key={i} className={`text-3xl font-bold mb-4 ${style.accentColor}`}>{line.replace('# ', '')}</h1>;
+        if (line.startsWith('## ')) return <h2 key={i} className={`text-2xl font-bold mt-6 mb-3 border-b border-current pb-1`}>{line.replace('## ', '')}</h2>;
+        if (line.startsWith('### ')) return <h3 key={i} className="text-xl font-bold mt-4 mb-2">{line.replace('### ', '')}</h3>;
+        if (line.startsWith('* ') || line.startsWith('- ')) return <li key={i} className="ml-4 list-disc marker:opacity-50">{line.replace(/^[*|-]\s/, '')}</li>;
+        // Simple bold parser
+        const parts = line.split(/(\*\*.*?\*\*)/g);
+        return (
+            <p key={i} className="mb-2 opacity-90 leading-relaxed">
+                {parts.map((part, index) => {
+                    if (part.startsWith('**') && part.endsWith('**')) {
+                        return <strong key={index} className={style.accentColor}>{part.slice(2, -2)}</strong>;
+                    }
+                    return part;
+                })}
+            </p>
+        );
+    });
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
@@ -122,7 +151,12 @@ export const FileIntelligence: React.FC<Props> = ({ apiKey, config, style, setCo
                      {chatHistory.map((msg, i) => (
                          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                              <div className={`max-w-[85%] p-3 rounded-lg text-sm ${msg.role === 'user' ? 'bg-white/20 ml-4' : 'bg-black/20 mr-4'}`}>
-                                 {msg.content}
+                                 {/* Render chat message with basic markdown support */}
+                                 {msg.role === 'model' ? (
+                                     <div className="prose prose-invert prose-sm leading-relaxed">
+                                        {msg.content.split('\n').map((l, j) => <p key={j} className="mb-1">{l}</p>)}
+                                     </div>
+                                 ) : msg.content}
                              </div>
                          </div>
                      ))}
@@ -153,16 +187,51 @@ export const FileIntelligence: React.FC<Props> = ({ apiKey, config, style, setCo
                   <p className="mt-2 text-sm">- Edgar Degas</p>
               </div>
           ) : (
-              <div className="prose prose-sm lg:prose-base max-w-none">
-                  {/* Simplistic Markdown Rendering */}
-                  {summary.split('\n').map((line, i) => {
-                      if (line.startsWith('# ')) return <h1 key={i} className={`text-3xl font-bold mb-4 ${style.accentColor}`}>{line.replace('# ', '')}</h1>;
-                      if (line.startsWith('## ')) return <h2 key={i} className={`text-2xl font-bold mt-6 mb-3 border-b border-current pb-1`}>{line.replace('## ', '')}</h2>;
-                      if (line.startsWith('### ')) return <h3 key={i} className="text-xl font-bold mt-4 mb-2">{line.replace('### ', '')}</h3>;
-                      if (line.startsWith('* ')) return <li key={i} className="ml-4 list-disc marker:opacity-50">{line.replace('* ', '')}</li>;
-                      return <p key={i} className="mb-2 opacity-90 leading-relaxed">{line}</p>;
-                  })}
-              </div>
+              <>
+                  <div className="absolute top-4 right-4 flex gap-2 z-20">
+                      <button 
+                        onClick={() => setViewMode(prev => prev === 'markdown' ? 'text' : 'markdown')} 
+                        className="p-2 bg-black/20 hover:bg-black/40 rounded text-white transition-colors"
+                        title={viewMode === 'markdown' ? "View Raw Text" : "View Markdown"}
+                      >
+                          {viewMode === 'markdown' ? <Code className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}
+                      </button>
+                      <button 
+                        onClick={copyToClipboard} 
+                        className="p-2 bg-black/20 hover:bg-black/40 rounded text-white transition-colors"
+                        title="Copy to Clipboard"
+                      >
+                          {copied ? <Check className="w-4 h-4"/> : <Copy className="w-4 h-4"/>}
+                      </button>
+                      <button 
+                        onClick={() => downloadContent(summary, `Report-${file?.name}`, 'md')} 
+                        className="p-2 bg-black/20 hover:bg-black/40 rounded text-white transition-colors flex items-center gap-1 text-xs"
+                        title="Download Markdown"
+                      >
+                          <Download className="w-4 h-4"/> MD
+                      </button>
+                      <button 
+                        onClick={() => downloadContent(summary, `Report-${file?.name}`, 'txt')} 
+                        className="p-2 bg-black/20 hover:bg-black/40 rounded text-white transition-colors flex items-center gap-1 text-xs"
+                        title="Download Text"
+                      >
+                          <FileText className="w-4 h-4"/> TXT
+                      </button>
+                  </div>
+                  <div className="pt-8">
+                      {viewMode === 'markdown' ? (
+                          <div className="prose prose-sm lg:prose-base max-w-none">
+                              {renderMarkdown(summary)}
+                          </div>
+                      ) : (
+                          <textarea 
+                            readOnly 
+                            value={summary} 
+                            className="w-full h-full min-h-[60vh] bg-black/10 p-4 rounded-lg font-mono text-sm resize-none focus:outline-none text-opacity-80 leading-relaxed"
+                          />
+                      )}
+                  </div>
+              </>
           )}
       </div>
     </div>

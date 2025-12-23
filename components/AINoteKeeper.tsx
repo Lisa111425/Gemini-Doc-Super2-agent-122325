@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, Sparkles, Wand2, CheckSquare, AlignLeft, Send, Type, Edit3, Eye, FileText, Eraser } from 'lucide-react';
+import { Bot, Sparkles, Wand2, CheckSquare, AlignLeft, Send, Type, Edit3, Eye, FileText, Eraser, Copy, Check, Download } from 'lucide-react';
 import { GeminiService } from '../services/geminiService';
+import { downloadContent } from '../services/fileService';
 import { AnalysisConfig, ArtistStyle, ChatMessage, SUPPORTED_MODELS } from '../types';
 
 interface Props {
@@ -20,6 +21,7 @@ export const AINoteKeeper: React.FC<Props> = ({ apiKey, config, style, setConfig
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [query, setQuery] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleTransform = async () => {
@@ -59,6 +61,12 @@ export const AINoteKeeper: React.FC<Props> = ({ apiKey, config, style, setConfig
     
     setChatHistory(prev => [...prev, { role: 'model', content: response, timestamp: Date.now() } as ChatMessage]);
     setChatLoading(false);
+  };
+
+  const copyToClipboard = () => {
+      navigator.clipboard.writeText(organizedNote);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
   };
 
   useEffect(() => {
@@ -116,6 +124,16 @@ export const AINoteKeeper: React.FC<Props> = ({ apiKey, config, style, setConfig
 
                  <div className="flex-1 overflow-hidden flex flex-col relative bg-white/5 rounded-xl border border-white/10">
                      <div className="absolute top-2 right-2 flex gap-1 z-10">
+                         <button onClick={copyToClipboard} className="p-1.5 bg-black/40 rounded hover:bg-black/60 text-white" title="Copy">
+                             {copied ? <Check className="w-3 h-3 text-green-400"/> : <Copy className="w-3 h-3"/>}
+                         </button>
+                         <button onClick={() => downloadContent(organizedNote, 'SmartNote', 'md')} className="p-1.5 bg-black/40 rounded hover:bg-black/60 text-white" title="Download MD">
+                             <Download className="w-3 h-3"/>
+                         </button>
+                         <button onClick={() => downloadContent(organizedNote, 'SmartNote', 'txt')} className="p-1.5 bg-black/40 rounded hover:bg-black/60 text-white" title="Download TXT">
+                             <FileText className="w-3 h-3"/>
+                         </button>
+                         <div className="w-px h-4 bg-white/20 mx-1"></div>
                          <button onClick={() => setViewMode(viewMode === 'edit' ? 'preview' : 'edit')} className="p-1.5 bg-black/40 rounded hover:bg-black/60 text-white" title="Toggle View">
                              {viewMode === 'edit' ? <Eye className="w-3 h-3"/> : <Edit3 className="w-3 h-3"/>}
                          </button>
@@ -128,10 +146,10 @@ export const AINoteKeeper: React.FC<Props> = ({ apiKey, config, style, setConfig
                          <textarea 
                              value={organizedNote}
                              onChange={(e) => setOrganizedNote(e.target.value)}
-                             className="flex-1 w-full h-full bg-transparent p-4 resize-none focus:outline-none font-mono text-sm"
+                             className="flex-1 w-full h-full bg-transparent p-4 resize-none focus:outline-none font-mono text-sm pt-12"
                          />
                      ) : (
-                         <div className="flex-1 w-full h-full overflow-y-auto p-4 prose prose-sm prose-invert max-w-none">
+                         <div className="flex-1 w-full h-full overflow-y-auto p-4 pt-12 prose prose-sm prose-invert max-w-none">
                             {organizedNote.split('\n').map((line, i) => {
                                 if (line.startsWith('# ')) return <h1 key={i} className={`text-2xl font-bold mb-4 mt-2 ${style.accentColor}`}>{line.replace('# ', '')}</h1>;
                                 if (line.startsWith('## ')) return <h2 key={i} className={`text-xl font-bold mt-4 mb-2 border-b border-white/20 pb-1`}>{line.replace('## ', '')}</h2>;
